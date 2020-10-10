@@ -1,0 +1,3 @@
+<launch>
+    <node pkg="anafi_driver" type="anafi_driver_node" name="anafi_driver_node" />
+</launch>
