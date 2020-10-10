@@ -21,6 +21,7 @@ class Control:
 
 def main(args):
     ctrl = Control()
+    rospy.init_node('anafi_driver', anonymous=True)
     ctrl.start()
     while not rospy.is_shutdown():
         rospy.spin()
