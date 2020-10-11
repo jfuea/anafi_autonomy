@@ -1,4 +1,8 @@
+<?xml version="1.0"?>
 <launch>
-    <node pkg="anafi_driver" type="anafi_driver_node.py" name="anafi_driver_node" />
-    <!-- <node pkg="anafi_driver" type="anafi_video_node.py" name="anafi_video_node" /> -->
+    <arg name="namespace" default="anafi" />
+    <arg name="DRONE_IP" default="10.202.0.1" />
+    <group ns="$(arg namespace)">
+        <node pkg="anafi_driver" type="anafi_driver_node.py" name="anafi_driver_node" />
+    </group>
 </launch>

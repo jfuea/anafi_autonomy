@@ -13,8 +13,9 @@
 ### references to similar packages
 [bebbop_autonomy](https://github.com/AutonomyLab/bebop_autonomy/tree/indigo-devel/bebop_driver)
 
-
 ### anafi
 [real_capabilities](https://forum.developer.parrot.com/t/additional-sensors-on-anafi/9066/2)
 [ros-config-pythonpath](https://forum.developer.parrot.com/t/use-olympe-from-a-ros-program/10009/12)
 
+### inspiration on ros structure
+[erc_sim_ws](https://github.com/fictionlab/erc_sim_ws)
