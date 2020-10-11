@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 import sys
 from math import pi
+
 import rospy
 from geometry_msgs.msg import Twist
+
 import olympe
 from olympe.messages.ardrone3.Piloting import TakeOff, moveBy, Landing
 from olympe.messages.ardrone3.PilotingState import FlyingStateChanged
@@ -12,16 +14,16 @@ from olympe.messages.ardrone3.SpeedSettingsState import (
     MaxVerticalSpeedChanged
 )
 
+olympe.log.update_config({"loggers": {"olympe": {"level": "WARNING"}}})
 
-class Control:
+
+class AnafiControl:
 
     def __init__(self):
         # *param server
         DRONE_IP = rospy.get_param("DRONE_IP", "10.202.0.1")
         # general
         self.drone = olympe.Drone(DRONE_IP)
-        self.sub_cmd_vel = rospy.Subscriber(
-            "cmd_vel", Twist, self.cmd_vel_callback, queue_size=1)
         # SpeedSettings
         self.speed_settings = False
         self.max_vertical_speed = None
@@ -30,6 +32,9 @@ class Control:
         # conversions
         # TODO may be a function, need more info
         self.tilt_to_speed = 6
+        # topics
+        self.sub_cmd_vel = rospy.Subscriber(
+            "cmd_vel", Twist, self.cmd_vel_cb, queue_size=1)
 
     def start(self):
         self.drone.connect()
@@ -68,7 +73,7 @@ class Control:
         )
 
     # callbacks
-    def cmd_vel_callback(self, twist_data):
+    def cmd_vel_cb(self, twist_data):
         if self.speed_settings:
             # TODO compare twists, threading, safe division when None max sett
             xy_conversion = self.tilt_to_speed * 100 // self.max_pitch_roll
@@ -83,7 +88,7 @@ class Control:
 
 
 def main(args):
-    ctrl = Control()
+    ctrl = AnafiControl()
     rospy.init_node('anafi_driver', anonymous=True)
     ctrl.start()
     ctrl.take_off()

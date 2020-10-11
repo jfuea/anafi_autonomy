@@ -1,3 +1,4 @@
 <launch>
     <node pkg="anafi_driver" type="anafi_driver_node.py" name="anafi_driver_node" />
+    <!-- <node pkg="anafi_driver" type="anafi_video_node.py" name="anafi_video_node" /> -->
 </launch>
