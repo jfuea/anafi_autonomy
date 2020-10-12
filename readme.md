@@ -20,6 +20,11 @@ add your /code/parrot-groundsdk/out/olympe-linux/final/usr/lib/python/site-packa
 ## use
 start sphinx
 ```bash
+sudo systemctl start firmwared.service
+roslaunch anafi_gazebo anafi_start_world.launch
+```
+start anafi_driver
+```bash
 source ~/code/parrot-groundsdk/olympe_custom_env.sh
 roslaunch anafi_driver anafi_driver.launch
 ```
@@ -37,7 +42,7 @@ default prefix `anafi/`
 
 * **`cmd_vel`** ([geometry_msgs/Twist])
 
-    Target velocity of the Rover.
+    Target velocity of the Drone.
     Only:
     linear.x, linear.y and linear.z (m/s)
     angular.z (r/s) are used.

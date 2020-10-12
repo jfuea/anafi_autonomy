@@ -1,0 +1,8 @@
+<?xml version="1.0"?>
+<launch>
+    <!-- <arg name="world_path" default="$(find anafi_gazebo)/worlds/default.world" /> -->
+    <!-- <arg name="world_path" default="$(find anafi_gazebo)/worlds/willowgarage.world" /> -->
+    <arg name="world_path" default="/opt/parrot-sphinx/usr/share/sphinx/worlds/outdoor_1.world" />
+    <!-- spaces are important -->
+    <node pkg="anafi_gazebo" type="start_sphinx.sh" name="bash_start_sphinx" args="$(arg world_path)" output="screen"/>
+</launch>
