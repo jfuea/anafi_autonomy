@@ -6,6 +6,7 @@ import cv2
 import queue
 
 import rospy
+from std_msgs.msg import Empty
 from geometry_msgs.msg import Twist
 from sensor_msgs.msg import Image
 from cv_bridge import CvBridge, CvBridgeError
@@ -22,7 +23,7 @@ from olympe.messages.ardrone3.SpeedSettingsState import (
 olympe.log.update_config({"loggers": {"olympe": {"level": "WARNING"}}})
 
 
-class Anafi(threading.Thread):
+class Anafi():
 
     def __init__(self):
         # *param server
@@ -35,17 +36,14 @@ class Anafi(threading.Thread):
         self.max_pitch_roll = None
         self.max_yaw = None
         # video
-        self.frame_queue = queue.Queue()
-        self.flush_queue_lock = threading.Lock()
-        super().__init__()
-        super().start()
         self.bridge = CvBridge()
         # conversions
         # TODO may be a function, need more info
         self.tilt_to_speed = 6
         # topics
-        self.sub_cmd_vel = rospy.Subscriber(
-            "cmd_vel", Twist, self.cmd_vel_cb, queue_size=1)
+        rospy.Subscriber("cmd_vel", Twist, self.cmd_vel_cb, queue_size=1)
+        rospy.Subscriber("takeoff", Empty, self.take_off, queue_size=1)
+        rospy.Subscriber("land", Empty, self.land, queue_size=1)
         self.camera_pub = rospy.Publisher(
             "camera/image_raw", Image, queue_size=1)
 
@@ -56,9 +54,6 @@ class Anafi(threading.Thread):
         # Setup your callback functions to do some live video processing
         self.drone.set_streaming_callbacks(
             raw_cb=self.yuv_frame_cb,
-            start_cb=self.start_cb,
-            end_cb=self.end_cb,
-            flush_raw_cb=self.flush_cb,
         )
         # Start video streaming
         self.drone.start_video_streaming()
@@ -78,21 +73,23 @@ class Anafi(threading.Thread):
         self.max_yaw = yaw['current'] * pi / 180
         self.speed_settings = True
 
-    def take_off(self):
+    def take_off(self, data):
         """Try to takeoff if is not already hovering or moving"""
         if (self.drone.get_state(FlyingStateChanged)["state"] is not
                 FlyingStateChanged_State.hovering):
             self.drone(TakeOff(_no_expect=True)
                        & FlyingStateChanged(state="hovering", _policy="wait",
-                                            _timeout=5)
+                                            _timeout=2)
                        ).wait()
 
-    def landing(self):
+    def land(self, data):
         self.drone.stop_piloting()
-        self.drone(
-            Landing()
-            >> FlyingStateChanged(state="landed", _timeout=5)
-        )
+        if (self.drone.get_state(FlyingStateChanged)["state"] is not
+                FlyingStateChanged_State.landed):
+            self.drone(Landing(_no_expect=True)
+                       & FlyingStateChanged(state="landed", _policy="wait",
+                                            _timeout=2)
+                       ).wait()
 
     # video
     def yuv_frame_cb(self, yuv_frame):
@@ -100,43 +97,7 @@ class Anafi(threading.Thread):
         This function will be called by Olympe for each decoded YUV frame.
             :type yuv_frame: olympe.VideoFrame
         """
-        yuv_frame.ref()
-        self.frame_queue.put_nowait(yuv_frame)
-
-    def flush_cb(self):
-        with self.flush_queue_lock:
-            while not self.frame_queue.empty():
-                self.frame_queue.get_nowait().unref()
-        return True
-
-    def start_cb(self):
-        pass
-
-    def end_cb(self):
-        pass
-
-    def run(self):
-        main_thread = next(
-            filter(lambda t: t.name == "MainThread", threading.enumerate())
-        )
-        while main_thread.is_alive():
-            with self.flush_queue_lock:
-                try:
-                    yuv_frame = self.frame_queue.get(timeout=0.01)
-                except queue.Empty:
-                    continue
-                try:
-                    self.publish_frame_content(yuv_frame)
-                except Exception:
-                    # We have to continue popping frame from the queue even if
-                    # we fail to show one frame
-                    traceback.print_exc()
-                finally:
-                    # Don't forget to unref the yuv frame. We don't want to
-                    # starve the video buffer pool
-                    yuv_frame.unref()
-
-    def publish_frame_content(self, yuv_frame):
+        # self.publish_frame_content(yuv_frame)
         # the VideoFrame.info() dictionary contains some useful information
         # such as the video resolution
         info = yuv_frame.info()
@@ -182,10 +143,8 @@ def main(args):
     ctrl = Anafi()
     rospy.init_node('anafi_driver', anonymous=True)
     ctrl.start()
-    ctrl.take_off()
     while not rospy.is_shutdown():
         rospy.spin()
-    ctrl.landing()
     ctrl.stop()
 
 
