@@ -13,6 +13,9 @@ python3 -m pip install -r ~/code/parrot-groundsdk/packages/olympe/requirements.t
 python3 -m pip install rospkg
 ```
 copy install/olympe_custom_env.sh to /$HOME/code/parrot-groundsdk or your sdk installation folder
+compile with catkin_make
+### python3 cvbridge issue solution
+in a separate workspace follow the [instructions](https://cyaninfinite.com/ros-cv-bridge-with-python-3/)
 
 ### for vscode
 add your /code/parrot-groundsdk/out/olympe-linux/final/usr/lib/python/site-packages to settings.json to get intellisense
@@ -33,6 +36,16 @@ roslaunch anafi_driver anafi_driver.launch
 roslaunch anafi_teleop teleop.launch
 ```
 
+### know issues
+exist a delay in the image delay, a workaround is to launch anafi_driver twice(also in the first time, a requeriment is to show the image topic)
+e.g.
+```bash
+roslaunch anafi_driver anafi_driver.launch
+```
+```bash
+rosrun image_view image_view image:=/anafi/camera/image_raw
+```
+repeat one time more to get images without delay
 ## ROS API
 
 The following topics and parameters are available on both the simulation and the real robot.

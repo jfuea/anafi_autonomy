@@ -1,18 +1,16 @@
 #!/usr/bin/env python3
 import sys
 from math import pi
-import threading
 import cv2
-import queue
 
 import rospy
 from std_msgs.msg import Empty
 from geometry_msgs.msg import Twist
-from sensor_msgs.msg import Image
+from sensor_msgs.msg import Image, BatteryState
 from cv_bridge import CvBridge, CvBridgeError
 
 import olympe
-from olympe.messages.ardrone3.Piloting import TakeOff, moveBy, Landing
+from olympe.messages.ardrone3.Piloting import TakeOff, moveBy, Landing, PCMD
 from olympe.messages.ardrone3.PilotingState import FlyingStateChanged
 from olympe.enums.ardrone3.PilotingState import FlyingStateChanged_State
 from olympe.messages.ardrone3.SpeedSettingsState import (
@@ -37,6 +35,7 @@ class Anafi():
         self.max_yaw = None
         # video
         self.bridge = CvBridge()
+        self.skip_frames = 1000
         # conversions
         # TODO may be a function, need more info
         self.tilt_to_speed = 6
@@ -46,16 +45,14 @@ class Anafi():
         rospy.Subscriber("land", Empty, self.land, queue_size=1)
         self.camera_pub = rospy.Publisher(
             "camera/image_raw", Image, queue_size=1)
-
+        self.battery_pub = rospy.Publisher(
+            "battery", BatteryState, queue_size=1)
     def start(self):
         self.drone.connect()
         self.get_speed_settings()
-        self.drone.start_piloting()
-        # Setup your callback functions to do some live video processing
         self.drone.set_streaming_callbacks(
             raw_cb=self.yuv_frame_cb,
         )
-        # Start video streaming
         self.drone.start_video_streaming()
 
     def stop(self):
@@ -83,7 +80,6 @@ class Anafi():
                        ).wait()
 
     def land(self, data):
-        self.drone.stop_piloting()
         if (self.drone.get_state(FlyingStateChanged)["state"] is not
                 FlyingStateChanged_State.landed):
             self.drone(Landing(_no_expect=True)
@@ -97,12 +93,18 @@ class Anafi():
         This function will be called by Olympe for each decoded YUV frame.
             :type yuv_frame: olympe.VideoFrame
         """
-        # self.publish_frame_content(yuv_frame)
-        # the VideoFrame.info() dictionary contains some useful information
-        # such as the video resolution
         info = yuv_frame.info()
-        height, width = info["yuv"]["height"], info["yuv"]["width"]
+        try:
+            battery = info["metadata"]["battery_percentage"]
+            battery = BatteryState()
+            battery.percentage = round(info["metadata"]["battery_percentage"] / 100, 2)
+            self.battery_pub.publish(
+                battery
+            )
+        except:
+            battery = 0
 
+        height, width = info["yuv"]["height"], info["yuv"]["width"]
         # yuv_frame.vmeta() returns a dictionary that contains additional
         # metadata from the drone (GPS coordinates, battery percentage, ...)
 
@@ -117,10 +119,10 @@ class Anafi():
 
         # Use OpenCV to convert the yuv frame to RGB
         cv2frame = cv2.cvtColor(yuv_frame.as_ndarray(), cv2_cvt_color_flag)
+        # delay is present both in simulated drone and real. see workarounds
         try:
             self.camera_pub.publish(
-                # self.bridge.cv2_to_imgmsg(cv2frame, "bgr16"))
-                self.bridge.cv2_to_imgmsg(cv2frame))
+                self.bridge.cv2_to_imgmsg(cv2frame, "bgr8"))
         except CvBridgeError as e:
             print(e)
 
@@ -136,7 +138,7 @@ class Anafi():
                 twist_data.linear.z * 100 // self.max_vertical_speed)
             yaw = - int(twist_data.angular.z * 100 // self.max_yaw)
             # run every 50ms in async mode for every pkg unless changed
-            self.drone.piloting_pcmd(roll, pitch, yaw, throttle, 0)
+            self.drone(PCMD(1, roll, pitch, yaw, throttle, timestampAndSeqNum=0))
 
 
 def main(args):
